@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      # Optional: mount a local NAS path into the container
+      # - /mnt/nas:/mnt/nas:ro
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+    restart: unless-stopped

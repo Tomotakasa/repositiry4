@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NAS フォトアルバム セレクター</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">📷</span>
+        <span class="logo-text">NAS Photo Album Selector</span>
+      </div>
+      <div class="header-actions">
+        <button id="btn-settings" class="btn-icon" title="設定">⚙️</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- ══ Step 1: NAS Connection ══════════════════════════════════════════ -->
+    <section class="card" id="section-connection">
+      <div class="card-header">
+        <span class="step-badge">1</span>
+        <h2>NAS 接続設定</h2>
+        <span id="conn-status" class="badge badge-idle">未接続</span>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>接続タイプ</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="conn-type" value="smb" checked /> SMB/CIFS <small>(Synology, QNAP等)</small>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="conn-type" value="sftp" /> SFTP/SSH
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="conn-type" value="local" /> ローカルパス <small>(マウント済み)</small>
+            </label>
+          </div>
+        </div>
+
+        <!-- SMB / SFTP fields -->
+        <div id="fields-network">
+          <div class="form-row-grid">
+            <div class="form-group">
+              <label>ホスト / IP</label>
+              <input type="text" id="nas-host" placeholder="192.168.1.100" />
+            </div>
+            <div class="form-group" id="smb-share-group">
+              <label>共有名 (SMB)</label>
+              <input type="text" id="nas-share" placeholder="photo" />
+            </div>
+            <div class="form-group">
+              <label>ユーザー名</label>
+              <input type="text" id="nas-user" placeholder="admin" />
+            </div>
+            <div class="form-group">
+              <label>パスワード</label>
+              <input type="password" id="nas-pass" placeholder="••••••••" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Local path fields -->
+        <div id="fields-local" style="display:none">
+          <div class="form-group">
+            <label>マウントパス</label>
+            <input type="text" id="nas-local-path" placeholder="/mnt/nas  または  /Volumes/NAS" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="btn-connect" class="btn btn-primary">接続テスト</button>
+          <span id="conn-message" class="status-message"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Step 2: Folder Selection ════════════════════════════════════════ -->
+    <section class="card" id="section-folders">
+      <div class="card-header">
+        <span class="step-badge">2</span>
+        <h2>フォルダ選択</h2>
+        <span id="folder-count-badge" class="badge badge-idle">0 フォルダ選択中</span>
+      </div>
+      <div class="card-body">
+        <div class="folder-browser">
+          <div class="browser-toolbar">
+            <button id="btn-folder-up" class="btn btn-sm">⬆ 上へ</button>
+            <span id="browser-path" class="browser-path">/</span>
+            <button id="btn-refresh-folder" class="btn btn-sm">🔄 更新</button>
+          </div>
+          <div id="folder-list" class="folder-list">
+            <div class="placeholder-msg">NASに接続してください</div>
+          </div>
+        </div>
+        <div id="selected-folders-panel" class="selected-folders-panel" style="display:none">
+          <h4>選択中のフォルダ:</h4>
+          <ul id="selected-folders-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Step 3: Album Settings ══════════════════════════════════════════ -->
+    <section class="card" id="section-album-settings">
+      <div class="card-header">
+        <span class="step-badge">3</span>
+        <h2>アルバム設定</h2>
+      </div>
+      <div class="card-body">
+        <div class="settings-grid">
+          <!-- Album type -->
+          <div class="form-group full-width">
+            <label>アルバムタイプ</label>
+            <div id="album-type-grid" class="album-type-grid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Custom prompt -->
+          <div class="form-group full-width" id="custom-prompt-group" style="display:none">
+            <label>カスタムテーマの説明</label>
+            <textarea id="custom-prompt" rows="2"
+              placeholder="例: 桜の花見の思い出、子どもたちの笑顔を中心に選んでください"></textarea>
+          </div>
+
+          <!-- Album name -->
+          <div class="form-group">
+            <label>アルバム名</label>
+            <input type="text" id="album-name" placeholder="2024年 夏の思い出" />
+          </div>
+
+          <!-- Output folder -->
+          <div class="form-group">
+            <label>保存先フォルダ (NAS上のパス)</label>
+            <div class="input-with-button">
+              <input type="text" id="output-folder" placeholder="/Albums" />
+              <button id="btn-browse-output" class="btn btn-sm">参照</button>
+            </div>
+          </div>
+
+          <!-- Photo count -->
+          <div class="form-group">
+            <label>選別枚数: <strong id="photo-count-label">30</strong> 枚</label>
+            <input type="range" id="photo-count" min="5" max="200" value="30" step="5" />
+            <div class="range-labels"><span>5枚</span><span>200枚</span></div>
+          </div>
+
+          <!-- Date range -->
+          <div class="form-group">
+            <label>撮影期間</label>
+            <div class="date-range">
+              <input type="date" id="date-from" />
+              <span>〜</span>
+              <input type="date" id="date-to" />
+              <button id="btn-clear-dates" class="btn btn-sm">クリア</button>
+            </div>
+          </div>
+
+          <!-- Advanced options -->
+          <details class="form-group full-width advanced-options">
+            <summary>詳細オプション</summary>
+            <div class="advanced-inner">
+              <label class="checkbox-label">
+                <input type="checkbox" id="include-raw" />
+                RAWファイルを含める (.CR2, .NEF, .ARW 等)
+              </label>
+              <div class="form-group">
+                <label>最低解像度 (px): <strong id="min-res-label">指定なし</strong></label>
+                <input type="range" id="min-resolution" min="0" max="4000" value="0" step="100" />
+                <div class="range-labels"><span>なし</span><span>4000px</span></div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- Photo count estimate -->
+        <div id="photo-estimate" class="photo-estimate" style="display:none">
+          <span id="estimate-text"></span>
+          <button id="btn-count-photos" class="btn btn-sm">📊 写真数を確認</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Step 4: Run & Results ═══════════════════════════════════════════ -->
+    <section class="card" id="section-run">
+      <div class="card-header">
+        <span class="step-badge">4</span>
+        <h2>実行</h2>
+      </div>
+      <div class="card-body">
+        <div class="run-summary" id="run-summary">
+          <!-- Populated before run -->
+        </div>
+        <div class="form-actions">
+          <button id="btn-run" class="btn btn-primary btn-large">
+            🚀 アルバム作成を開始
+          </button>
+        </div>
+
+        <!-- Progress -->
+        <div id="progress-panel" class="progress-panel" style="display:none">
+          <div class="progress-bar-wrap">
+            <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+          </div>
+          <p id="progress-message" class="progress-message">処理中...</p>
+        </div>
+
+        <!-- Results -->
+        <div id="result-panel" class="result-panel" style="display:none">
+          <div id="result-summary" class="result-summary"></div>
+          <h3>選別された写真</h3>
+          <div id="result-grid" class="photo-grid"></div>
+          <div class="form-actions">
+            <button id="btn-new-album" class="btn btn-secondary">新しいアルバムを作成</button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error-panel" class="error-panel" style="display:none">
+          <p id="error-message"></p>
+          <button id="btn-retry" class="btn btn-secondary">再試行</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══ Output Folder Browser Modal ═══════════════════════════════════════ -->
+  <div id="folder-modal" class="modal" style="display:none">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>保存先フォルダを選択</h3>
+        <button id="modal-close" class="btn-icon">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="browser-toolbar">
+          <button id="modal-folder-up" class="btn btn-sm">⬆ 上へ</button>
+          <span id="modal-browser-path" class="browser-path">/</span>
+        </div>
+        <div id="modal-folder-list" class="folder-list"></div>
+      </div>
+      <div class="modal-footer">
+        <span id="modal-selected-path" class="browser-path"></span>
+        <button id="modal-confirm" class="btn btn-primary">ここを選択</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
