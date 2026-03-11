@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: nas-photo-album-selector
+    runtime: docker
+    plan: free          # freeまたはstarter($7/月)に変更可
+    healthCheckPath: /api/auth/status
+    envVars:
+      - key: APP_PASSWORD
+        sync: false     # Renderダッシュボードで手動設定
+      - key: ANTHROPIC_API_KEY
+        sync: false     # Renderダッシュボードで手動設定
