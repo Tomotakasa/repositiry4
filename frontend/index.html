@@ -44,6 +44,117 @@
   </header>
 
   <main class="app-main">
+
+    <!-- ══ Setup Guide ══════════════════════════════════════════════════════ -->
+    <section class="card" id="section-setup-guide">
+      <div class="card-header" id="setup-guide-toggle" style="cursor:pointer">
+        <span class="step-badge" style="background:var(--text-muted)">?</span>
+        <h2>セットアップガイド</h2>
+        <span id="setup-guide-chevron" style="margin-left:auto;color:var(--text-muted)">▼</span>
+      </div>
+      <div class="card-body" id="setup-guide-body">
+
+        <!-- Mode selector -->
+        <div class="mode-tabs">
+          <button class="mode-tab active" id="tab-local" data-mode="local">
+            🏠 ローカル (自宅・社内)
+          </button>
+          <button class="mode-tab" id="tab-internet" data-mode="internet">
+            🌐 インターネット (外出先・クラウド)
+          </button>
+        </div>
+
+        <!-- Local mode -->
+        <div id="guide-local" class="guide-panel">
+          <div class="guide-req-list">
+            <div class="guide-req guide-req-ok">
+              <span class="req-icon">✅</span>
+              <div>
+                <strong>NASはローカルネットワーク内でOK</strong>
+                <p>192.168.x.x などの プライベートIPでアクセス可能なNASがあればそのまま使えます。</p>
+              </div>
+            </div>
+            <div class="guide-req guide-req-ok">
+              <span class="req-icon">✅</span>
+              <div>
+                <strong>SMB / SFTP / ローカルパス すべて利用可能</strong>
+                <p>同じLAN内なので接続方式を問いません。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-steps">
+            <h4>起動手順</h4>
+            <ol>
+              <li>
+                <span>ターミナルで以下を実行</span>
+                <pre><code>cd backend
+export ANTHROPIC_API_KEY="sk-ant-xxxx"
+export APP_PASSWORD="あなたのパスワード"   # 省略すると認証なし
+uvicorn main:app --host 0.0.0.0 --port 8000</code></pre>
+              </li>
+              <li>
+                <span>同じPCのブラウザで開く</span>
+                <pre><code>http://localhost:8000</code></pre>
+              </li>
+              <li>
+                <span>他のPCやスマホから使う場合は、サーバーPCのIPを使う</span>
+                <pre><code>http://192.168.x.x:8000</code></pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Internet mode -->
+        <div id="guide-internet" class="guide-panel" style="display:none">
+          <div class="guide-req-list">
+            <div class="guide-req guide-req-warn">
+              <span class="req-icon">⚠️</span>
+              <div>
+                <strong>NASをインターネットに公開する必要があります</strong>
+                <p>ルーターでポート開放 (SMB: 445 または SFTP: 22) が必要です。セキュリティのため <strong>SFTPを推奨</strong>します。固定IPまたはDDNSドメインがあると便利です。</p>
+              </div>
+            </div>
+            <div class="guide-req guide-req-ok">
+              <span class="req-icon">✅</span>
+              <div>
+                <strong>バックエンドは Render.com (無料) で動かせます</strong>
+                <p>Dockerfileが同梱済みなのでGitHubと連携するだけでデプロイできます。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-steps">
+            <h4>Render.com デプロイ手順</h4>
+            <ol>
+              <li>
+                <span><a href="https://render.com" target="_blank" rel="noopener">render.com</a> に無料登録し、GitHub と連携</span>
+              </li>
+              <li>
+                <span><strong>New → Web Service</strong> からこのリポジトリを選択</span>
+              </li>
+              <li>
+                <span>ダッシュボードの <strong>Environment</strong> タブで以下の環境変数を設定</span>
+                <table class="guide-env-table">
+                  <tr><th>キー</th><th>値</th></tr>
+                  <tr><td><code>APP_PASSWORD</code></td><td>ログインパスワード (任意の文字列)</td></tr>
+                  <tr><td><code>ANTHROPIC_API_KEY</code></td><td><code>sk-ant-xxxxxxxx...</code></td></tr>
+                </table>
+              </li>
+              <li>
+                <span><strong>Deploy</strong> → 完了後に表示されるURLでアクセス</span>
+                <pre><code>https://your-app-name.onrender.com</code></pre>
+              </li>
+            </ol>
+            <div class="guide-note">
+              💡 無料プランは15分間アクセスがないとスリープします。常時起動は <strong>$7/月 (Starter)</strong> プランに変更してください。
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- ══ Step 1: NAS Connection ══════════════════════════════════════════ -->
     <section class="card" id="section-connection">
       <div class="card-header">

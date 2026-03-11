@@ -56,6 +56,115 @@
   border: 1px solid #fecaca;
 }
 
+/* ── Setup Guide ─────────────────────────────────────────────── */
+.mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.mode-tab.active {
+  border-color: var(--primary);
+  background: #eff4ff;
+  color: var(--primary);
+}
+
+.guide-panel { animation: fadeIn 0.15s ease; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+.guide-req-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.guide-req {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+}
+
+.guide-req-ok  { background: #f0fdf4; border-color: #bbf7d0; }
+.guide-req-warn { background: #fffbeb; border-color: #fde68a; }
+
+.req-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.1rem; }
+
+.guide-req strong { display: block; margin-bottom: 0.2rem; font-size: 0.9rem; }
+.guide-req p { font-size: 0.83rem; color: var(--text-muted); margin: 0; }
+
+.guide-steps h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text);
+}
+
+.guide-steps ol {
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.guide-steps li { font-size: 0.88rem; }
+.guide-steps li span { display: block; margin-bottom: 0.35rem; }
+.guide-steps li a { color: var(--primary); }
+
+.guide-steps pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  margin-top: 0.25rem;
+}
+
+.guide-steps code { font-family: 'Courier New', monospace; }
+
+.guide-env-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-top: 0.35rem;
+}
+
+.guide-env-table th, .guide-env-table td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.guide-env-table th { background: var(--surface-2); font-weight: 600; }
+.guide-env-table code { font-family: 'Courier New', monospace; font-size: 0.8rem; }
+
+.guide-note {
+  margin-top: 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #eff4ff;
+  border-radius: var(--radius-sm);
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  border: 1px solid #c7d7fd;
+}
+
 :root {
   --primary: #4f7ef8;
   --primary-dark: #3563d4;

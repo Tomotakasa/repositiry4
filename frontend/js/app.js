@@ -138,10 +138,52 @@ async function showApp() {
     if (status.auth_enabled) showEl($("#btn-logout"));
   } catch (e) { /* ignore */ }
 
+  initSetupGuide();
   await loadAlbumTypes();
   await loadSavedConfig();
   bindEvents();
   updateRunSummary();
+}
+
+// ── Setup Guide ───────────────────────────────────────────────────────────────
+function initSetupGuide() {
+  const body = $("#setup-guide-body");
+  const chevron = $("#setup-guide-chevron");
+  const toggle = $("#setup-guide-toggle");
+
+  // Collapse/expand
+  const collapsed = localStorage.getItem("guide_collapsed") === "1";
+  if (collapsed) {
+    body.style.display = "none";
+    chevron.textContent = "▶";
+  }
+  toggle.addEventListener("click", () => {
+    const isHidden = body.style.display === "none";
+    body.style.display = isHidden ? "" : "none";
+    chevron.textContent = isHidden ? "▼" : "▶";
+    localStorage.setItem("guide_collapsed", isHidden ? "0" : "1");
+  });
+
+  // Mode tabs
+  const savedMode = localStorage.getItem("guide_mode") || "local";
+  setGuideMode(savedMode);
+
+  $$(".mode-tab").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const mode = btn.dataset.mode;
+      setGuideMode(mode);
+      localStorage.setItem("guide_mode", mode);
+    });
+  });
+}
+
+function setGuideMode(mode) {
+  $$(".mode-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+  $("#guide-local").style.display    = mode === "local"    ? "" : "none";
+  $("#guide-internet").style.display = mode === "internet" ? "" : "none";
 }
 
 async function loadAlbumTypes() {
