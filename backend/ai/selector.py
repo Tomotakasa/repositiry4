@@ -24,8 +24,8 @@ import anthropic
 
 # Tuning constants
 BATCH_SIZE = 8          # images per Claude API call (keeps token count low)
-CANDIDATE_MULTIPLIER = 3  # select top N*3 locally before sending to Claude
-MAX_CANDIDATES = 80     # hard cap to limit API calls
+CANDIDATE_MULTIPLIER = 2  # select top N*2 locally before sending to Claude
+MAX_CANDIDATES = 1500   # hard cap; auto-adjusted to max(count*2, 80) at runtime
 MODEL = "claude-haiku-4-5-20251001"  # cheapest model; sufficient for photo ranking
 
 
@@ -65,9 +65,11 @@ class ClaudePhotoSelector:
         if not photos:
             return []
 
-        # Step 1: Select candidates (limit to avoid too many API calls)
+        # Step 1: Select candidates (N*2 but at least count+20, hard cap at MAX_CANDIDATES)
         max_candidates = min(len(photos), max(count * CANDIDATE_MULTIPLIER, count + 20))
         max_candidates = min(max_candidates, MAX_CANDIDATES)
+        # Always ensure we have at least `count` candidates
+        max_candidates = max(max_candidates, min(count, len(photos)))
         candidates = photos[:max_candidates]  # Already sorted by quality_score
 
         # Build album-specific prompt
