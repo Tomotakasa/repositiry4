@@ -3,13 +3,14 @@ Claude AI Photo Selector.
 
 Strategy to minimize API consumption:
 1. Pre-filter photos locally (blur, duplicates, quality) - NO API calls
-2. Take top N candidates based on local quality score (N = photo_count * 3)
-3. Split candidates into batches of up to 8 images per API call
-4. Each Claude call evaluates a batch and scores/ranks photos (1-10)
-5. Final selection = top `photo_count` photos by AI score
-6. Use claude-haiku (cheapest) for batch scoring, use claude-sonnet only for
-   optional final curation pass if enabled
-7. Cache results by photo hash to avoid re-processing
+2. [Hybrid] If CLIP is available: score top N*3 candidates locally,
+   keep best N*2 for Claude → reduces Claude calls by ~33%
+3. If CLIP is unavailable: fall back to top N*2 by quality score (original)
+4. Split candidates into batches of up to 8 images per API call
+5. Each Claude call evaluates a batch and scores/ranks photos (1-10)
+6. Final selection = top `photo_count` photos by AI score
+7. Use claude-haiku (cheapest) for batch scoring
+8. Cache results by photo hash to avoid re-processing
 """
 
 import asyncio
@@ -22,11 +23,16 @@ from typing import List, Dict, Any, Callable, Optional
 
 import anthropic
 
+from .local_scorer import LocalPhotoScorer
+
 # Tuning constants
-BATCH_SIZE = 8          # images per Claude API call (keeps token count low)
-CANDIDATE_MULTIPLIER = 2  # select top N*2 locally before sending to Claude
-MAX_CANDIDATES = 1500   # hard cap; auto-adjusted to max(count*2, 80) at runtime
+BATCH_SIZE = 8              # images per Claude API call (keeps token count low)
+CANDIDATE_MULTIPLIER = 2    # top N*2 candidates sent to Claude
+LOCAL_MULTIPLIER = 3        # top N*3 fetched for local CLIP pre-filter (hybrid)
+MAX_CANDIDATES = 1500       # hard cap for Claude candidates
 MODEL = "claude-haiku-4-5-20251001"  # cheapest model; sufficient for photo ranking
+
+_local_scorer = LocalPhotoScorer()
 
 
 ALBUM_PROMPTS = {
@@ -65,19 +71,42 @@ class ClaudePhotoSelector:
         if not photos:
             return []
 
-        # Step 1: Select candidates (N*2 but at least count+20, hard cap at MAX_CANDIDATES)
-        max_candidates = min(len(photos), max(count * CANDIDATE_MULTIPLIER, count + 20))
-        max_candidates = min(max_candidates, MAX_CANDIDATES)
-        # Always ensure we have at least `count` candidates
-        max_candidates = max(max_candidates, min(count, len(photos)))
-        candidates = photos[:max_candidates]  # Already sorted by quality_score
-
         # Build album-specific prompt
         album_prompt = ALBUM_PROMPTS.get(album_type, ALBUM_PROMPTS["general"])
         if album_type == "custom" and custom_prompt:
             album_prompt = custom_prompt
         elif custom_prompt:
             album_prompt = album_prompt + " 追加指示: " + custom_prompt
+
+        # Step 1: Select candidates
+        # Hybrid path: expand pool to N*3 for local CLIP scoring, then trim to N*2 for Claude.
+        # Fallback path: take N*2 directly by quality_score (original behaviour).
+        if _local_scorer.is_available():
+            # Wider net for local scoring
+            local_pool_size = min(len(photos), max(count * LOCAL_MULTIPLIER, count + 30))
+            local_pool_size = min(local_pool_size, MAX_CANDIDATES * 2)
+            local_pool = photos[:local_pool_size]
+
+            if progress_callback:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, progress_callback, 0.0, f"ローカルAI評価中... ({local_pool_size}枚)")
+
+            # Score locally (synchronous but fast on CPU for thumbnails)
+            local_pool = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: _local_scorer.score_photos(local_pool, album_type, custom_prompt),
+            )
+            # Keep top N*2 by CLIP score for Claude
+            claude_pool_size = min(len(local_pool), max(count * CANDIDATE_MULTIPLIER, count + 20))
+            claude_pool_size = min(claude_pool_size, MAX_CANDIDATES)
+            claude_pool_size = max(claude_pool_size, min(count, len(local_pool)))
+            candidates = local_pool[:claude_pool_size]
+        else:
+            # Original fallback: top N*2 by quality_score
+            max_candidates = min(len(photos), max(count * CANDIDATE_MULTIPLIER, count + 20))
+            max_candidates = min(max_candidates, MAX_CANDIDATES)
+            max_candidates = max(max_candidates, min(count, len(photos)))
+            candidates = photos[:max_candidates]
 
         # Step 2: Score candidates in batches
         if progress_callback:

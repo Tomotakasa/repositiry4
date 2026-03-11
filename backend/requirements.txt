@@ -7,3 +7,10 @@ anthropic>=0.34.0
 pysmb==1.2.9.1
 paramiko==3.4.0
 python-dotenv==1.0.1
+
+# ── Optional: local CLIP pre-filtering (reduces Claude API calls ~33%) ──
+# Uncomment to enable hybrid local+Claude scoring.
+# First run downloads the CLIP model (~340 MB) to ~/.cache/huggingface/
+#
+# torch>=2.0.0
+# transformers>=4.35.0
