@@ -4,6 +4,21 @@
 
 const API = "";  // Same origin
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const auth = {
+  token: sessionStorage.getItem("nas_token") || null,
+
+  save(token) {
+    this.token = token;
+    sessionStorage.setItem("nas_token", token);
+  },
+
+  clear() {
+    this.token = null;
+    sessionStorage.removeItem("nas_token");
+  },
+};
+
 // ── State ────────────────────────────────────────────────────────────────────
 const state = {
   connected: false,
@@ -38,11 +53,96 @@ function setMessage(el, text, type = "") {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
+  await initAuth();
+});
+
+async function initAuth() {
+  // Check if server requires auth
+  let authEnabled = false;
+  try {
+    const status = await apiFetch("/api/auth/status");
+    authEnabled = status.auth_enabled;
+  } catch (e) {
+    // If this call fails (401), auth is definitely enabled
+    authEnabled = true;
+  }
+
+  if (!authEnabled) {
+    // Auth disabled: go straight to app
+    showApp();
+    return;
+  }
+
+  // Auth enabled: check existing token
+  if (auth.token) {
+    try {
+      // Validate token by calling a protected endpoint
+      await apiFetch("/api/album-types");
+      showApp();
+      return;
+    } catch (e) {
+      auth.clear();
+    }
+  }
+
+  // Show login overlay
+  showLoginOverlay();
+}
+
+function showLoginOverlay() {
+  const overlay = $("#login-overlay");
+  showEl(overlay);
+  hideEl($("header.app-header"));
+  hideEl($("main.app-main"));
+
+  const form = $("#login-form");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("#btn-login");
+    const errEl = $("#login-error");
+    hideEl(errEl);
+    btn.disabled = true;
+    btn.textContent = "確認中...";
+
+    try {
+      const password = $("#login-password").value;
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "ログイン失敗");
+      }
+      const data = await res.json();
+      auth.save(data.token);
+      hideEl(overlay);
+      showApp();
+    } catch (err) {
+      errEl.textContent = err.message;
+      showEl(errEl);
+      btn.disabled = false;
+      btn.textContent = "ログイン";
+    }
+  });
+}
+
+async function showApp() {
+  showEl($("header.app-header"));
+  showEl($("main.app-main"));
+
+  // Show logout button only if auth is enabled
+  try {
+    const status = await apiFetch("/api/auth/status");
+    if (status.auth_enabled) showEl($("#btn-logout"));
+  } catch (e) { /* ignore */ }
+
   await loadAlbumTypes();
   await loadSavedConfig();
   bindEvents();
   updateRunSummary();
-});
+}
 
 async function loadAlbumTypes() {
   try {
@@ -162,6 +262,13 @@ function bindEvents() {
 
   // Album name change
   $("#album-name").addEventListener("input", updateRunSummary);
+
+  // Logout
+  $("#btn-logout").addEventListener("click", async () => {
+    try { await apiFetch("/api/auth/logout", "POST"); } catch (e) { /* ignore */ }
+    auth.clear();
+    location.reload();
+  });
 }
 
 function toggleConnectionFields(type) {
@@ -601,15 +708,18 @@ function resetForNewAlbum() {
 
 // ── API Utilities ─────────────────────────────────────────────────────────────
 async function apiFetch(endpoint, method = "GET", body = null) {
-  const opts = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (auth.token) headers["Authorization"] = `Bearer ${auth.token}`;
+  const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(API + endpoint, opts);
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try { const err = await res.json(); msg = err.detail || msg; } catch {}
+    if (res.status === 401) {
+      auth.clear();
+      location.reload();
+    }
     throw new Error(msg);
   }
   return res.json();

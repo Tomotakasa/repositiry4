@@ -8,14 +8,16 @@ import json
 import asyncio
 import tempfile
 import shutil
+import secrets
 from datetime import datetime, date
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from nas.smb_client import SMBClient
@@ -39,6 +41,54 @@ jobs: Dict[str, Dict[str, Any]] = {}
 
 # Config storage path
 CONFIG_FILE = Path("/tmp/nas_album_config.json")
+
+# ── Authentication ────────────────────────────────────────────────────────────
+
+# Active session tokens (in-memory)
+_valid_tokens: set = set()
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _auth_enabled() -> bool:
+    return bool(os.environ.get("APP_PASSWORD", "").strip())
+
+
+def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+    """Dependency: verify Bearer token when APP_PASSWORD is set."""
+    if not _auth_enabled():
+        return  # Auth disabled — allow all requests
+    if credentials is None or credentials.credentials not in _valid_tokens:
+        raise HTTPException(status_code=401, detail="認証が必要です。ログインしてください。")
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest):
+    """Verify password and return a session token."""
+    expected = os.environ.get("APP_PASSWORD", "")
+    if not expected or not secrets.compare_digest(req.password, expected):
+        raise HTTPException(status_code=401, detail="パスワードが正しくありません。")
+    token = secrets.token_hex(32)
+    _valid_tokens.add(token)
+    return {"token": token}
+
+
+@app.post("/api/auth/logout")
+async def logout(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+    """Invalidate the current session token."""
+    if credentials and credentials.credentials in _valid_tokens:
+        _valid_tokens.discard(credentials.credentials)
+    return {"success": True}
+
+
+@app.get("/api/auth/status")
+async def auth_status():
+    """Return whether authentication is enabled."""
+    return {"auth_enabled": _auth_enabled()}
 
 
 # ── Request Models ──────────────────────────────────────────────────────────
@@ -170,13 +220,16 @@ def get_nas_client(req: Any):
 
 # ── API Endpoints ────────────────────────────────────────────────────────────
 
-@app.get("/api/album-types")
+_auth = Depends(require_auth)
+
+
+@app.get("/api/album-types", dependencies=[_auth])
 async def get_album_types():
     """Return available album types."""
     return ALBUM_TYPES
 
 
-@app.post("/api/nas/test")
+@app.post("/api/nas/test", dependencies=[_auth])
 async def test_nas_connection(req: NASConnectionRequest):
     """Test NAS connection."""
     try:
@@ -187,7 +240,7 @@ async def test_nas_connection(req: NASConnectionRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/nas/browse")
+@app.post("/api/nas/browse", dependencies=[_auth])
 async def browse_nas_folder(req: FolderBrowseRequest):
     """Browse NAS folders."""
     try:
@@ -198,7 +251,7 @@ async def browse_nas_folder(req: FolderBrowseRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/photos/count")
+@app.post("/api/photos/count", dependencies=[_auth])
 async def count_photos(req: AlbumRequest):
     """Count photos in selected folders with date filter (fast, no AI)."""
     try:
@@ -218,7 +271,7 @@ async def count_photos(req: AlbumRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/album/create")
+@app.post("/api/album/create", dependencies=[_auth])
 async def create_album(req: AlbumRequest, background_tasks: BackgroundTasks):
     """Start async album creation job."""
     import uuid
@@ -234,7 +287,7 @@ async def create_album(req: AlbumRequest, background_tasks: BackgroundTasks):
     return {"job_id": job_id}
 
 
-@app.get("/api/album/status/{job_id}")
+@app.get("/api/album/status/{job_id}", dependencies=[_auth])
 async def get_job_status(job_id: str):
     """Get status of an album creation job."""
     if job_id not in jobs:
@@ -242,7 +295,7 @@ async def get_job_status(job_id: str):
     return jobs[job_id]
 
 
-@app.get("/api/photo/thumbnail/{job_id}/{index}")
+@app.get("/api/photo/thumbnail/{job_id}/{index}", dependencies=[_auth])
 async def get_thumbnail(job_id: str, index: int):
     """Serve a thumbnail from a completed job."""
     if job_id not in jobs:
@@ -260,7 +313,7 @@ async def get_thumbnail(job_id: str, index: int):
     return FileResponse(thumb_path, media_type="image/jpeg")
 
 
-@app.post("/api/config/save")
+@app.post("/api/config/save", dependencies=[_auth])
 async def save_config(config: dict):
     """Save NAS connection config (passwords excluded)."""
     safe_config = {k: v for k, v in config.items() if k != "password"}
@@ -268,7 +321,7 @@ async def save_config(config: dict):
     return {"success": True}
 
 
-@app.get("/api/config/load")
+@app.get("/api/config/load", dependencies=[_auth])
 async def load_config():
     """Load saved NAS connection config."""
     if CONFIG_FILE.exists():

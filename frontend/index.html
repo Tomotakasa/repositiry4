@@ -7,6 +7,29 @@
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
 <body>
+
+  <!-- ══ Login Overlay ═══════════════════════════════════════════════════════ -->
+  <div id="login-overlay" class="login-overlay" style="display:none">
+    <div class="login-card">
+      <div class="login-logo">
+        <span>📷</span>
+        <h1>NAS Photo Album Selector</h1>
+      </div>
+      <p class="login-subtitle">パスワードを入力してください</p>
+      <form id="login-form" autocomplete="on">
+        <div class="form-group">
+          <label for="login-password">パスワード</label>
+          <input type="password" id="login-password" autocomplete="current-password"
+                 placeholder="••••••••" required />
+        </div>
+        <p id="login-error" class="login-error" style="display:none"></p>
+        <button type="submit" id="btn-login" class="btn btn-primary" style="width:100%">
+          ログイン
+        </button>
+      </form>
+    </div>
+  </div>
+
   <header class="app-header">
     <div class="header-inner">
       <div class="logo">
@@ -15,6 +38,7 @@
       </div>
       <div class="header-actions">
         <button id="btn-settings" class="btn-icon" title="設定">⚙️</button>
+        <button id="btn-logout" class="btn btn-sm" title="ログアウト" style="display:none">ログアウト</button>
       </div>
     </div>
   </header>
